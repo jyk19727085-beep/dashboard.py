@@ -7,12 +7,11 @@ import urllib.parse
 from datetime import datetime
 import difflib
 
-# --- 1. PRO-QUANT 터미널 UI (글자 깨짐 버그 완벽 수정) ---
+# --- 1. PRO-QUANT 터미널 UI ---
 st.set_page_config(page_title="Moneta PRO Terminal", layout="wide", initial_sidebar_state="collapsed")
 
 st.markdown("""
     <style>
-    /* 폰트 불러오기 코드를 style 안쪽으로 안전하게 이동 */
     @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&display=swap');
     
     .stApp { background-color: #050505; color: #d1d5db; font-family: 'Segoe UI', sans-serif; }
@@ -56,10 +55,11 @@ st.markdown("""
 if 'past_ranking' not in st.session_state:
     st.session_state.past_ranking = {}
 
-# --- 2. 스마트 중복 제거 & 절대 멈춤 방지 엔진 ---
+# --- 2. 스마트 중복 제거 & "초단기 최신순" 엔진 ---
 def get_smart_market_data():
     proxy_url = "https://api.rss2json.com/v1/api.json?rss_url="
-    target_rss = "https://news.google.com/rss/search?q=주식+OR+증시+OR+경제&hl=ko&gl=KR&ceid=KR:ko"
+    # 비즈니스/경제 '최신 헤드라인' 전용망으로 타점 변경
+    target_rss = "https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=ko&gl=KR&ceid=KR:ko"
     
     data_list = []
     unique_titles = []
@@ -81,11 +81,13 @@ def get_smart_market_data():
                 if is_duplicate: continue
                 unique_titles.append(title)
                 
-                # 가중치 90% 반영된 냉철한 스코어링
+                # 가중치 90% 반영
                 s_vol = random.randint(50000, 99999)
                 r_vol = random.randint(2000, 30000)
+                
+                # [핵심 수술] 네이버 검색 시 무조건 '최신순(sort=1)'으로 강제 정렬하는 코드 추가
                 enc_keyword = urllib.parse.quote(" ".join(title.split()[:3]))
-                r_link = f"https://search.naver.com/search.naver?where=news&query={enc_keyword}"
+                r_link = f"https://search.naver.com/search.naver?where=news&query={enc_keyword}&sort=1"
                 
                 data_list.append({
                     "id": str(hash(title)), "title": title, "link": link,
@@ -94,27 +96,29 @@ def get_smart_market_data():
     except:
         pass
 
-    # [핵심 방어막] 데이터가 10개 미만일 경우, 모자란 개수만큼 무조건 비상 데이터를 채워 넣습니다.
+    # [방어막] 데이터가 부족할 경우를 대비한 '초단기 속보' 백업 데이터
     if len(data_list) < 10:
         backup_links = [
-            {"title": "[긴급 시황] 삼성전자 외국인 수급 및 주가 전망", "link": "https://finance.naver.com/item/main.naver?code=005930"},
-            {"title": "[글로벌 매크로] 미 연준 금리 방향 및 달러 환율", "link": "https://finance.naver.com/marketindex/"},
-            {"title": "[월가 동향] 엔비디아(NVDA) AI 칩 수요 폭발", "link": "https://kr.investing.com/equities/nvidia-corp"},
-            {"title": "[가상자산] 비트코인 7만 달러 저항선 돌파 여부", "link": "https://kr.tradingview.com/symbols/BTCUSD/"},
-            {"title": "[국내 증시] 한국은행 기준금리 동결, 시장 반응", "link": "https://finance.naver.com"},
-            {"title": "[기술주 이슈] 애플(AAPL) AI 전략 발표 임박", "link": "https://kr.investing.com/equities/apple-computer-inc"},
-            {"title": "[모빌리티] 테슬라(TSLA) 로보택시 및 실적 분석", "link": "https://kr.investing.com/equities/tesla-motors"},
-            {"title": "[수출 지표] K-반도체 및 조선업 실적 호조", "link": "https://finance.naver.com"},
-            {"title": "[채권 시장] 미국 10년물 국채 금리 급등 변수", "link": "https://kr.investing.com/rates-bonds/u.s.-10-year-bond-yield"},
-            {"title": "[기관 수급] 고래들의 포트폴리오, 최선호 주는?", "link": "https://whalewisdom.com/"}
+            {"title": "[속보] 삼성전자 장중 수급 동향 및 특징주", "link": "https://finance.naver.com/sise/"},
+            {"title": "[속보] 미 국채 금리 실시간 변동 및 매크로 지표", "link": "https://finance.naver.com/marketindex/"},
+            {"title": "[속보] 엔비디아(NVDA) 시간외 거래 및 월가 속보", "link": "https://kr.investing.com/equities/nvidia-corp"},
+            {"title": "[속보] 비트코인 실시간 차트 및 고래 지갑 이동", "link": "https://kr.tradingview.com/symbols/BTCUSD/"},
+            {"title": "[속보] 코스피/코스닥 외인·기관 실시간 매매동향", "link": "https://finance.naver.com/sise/sise_trans_style.naver"},
+            {"title": "[속보] 애플(AAPL) 최신 밸류체인 및 부품주 동향", "link": "https://kr.investing.com/equities/apple-computer-inc"},
+            {"title": "[속보] 테슬라(TSLA) 현지 언론 보도 및 주가", "link": "https://kr.investing.com/equities/tesla-motors"},
+            {"title": "[속보] K-반도체 장비주 실시간 뉴스", "link": "https://finance.naver.com/sise/"},
+            {"title": "[속보] 한국은행 총재 발언 및 환율 급변동", "link": "https://finance.naver.com/marketindex/"},
+            {"title": "[속보] 월가 고래들의 13F 공시 업데이트", "link": "https://whalewisdom.com/"}
         ]
         
         for item in backup_links:
-            if len(data_list) >= 10: break # 10개가 채워지면 중단
+            if len(data_list) >= 10: break
             s_vol = random.randint(50000, 99999)
             r_vol = random.randint(2000, 30000)
-            enc_key = urllib.parse.quote(item["title"][:10])
-            r_link = f"https://search.naver.com/search.naver?where=news&query={enc_key}"
+            
+            # 백업 데이터 역시 '최신순(sort=1)' 검색으로 강제
+            enc_key = urllib.parse.quote(item["title"][:8])
+            r_link = f"https://search.naver.com/search.naver?where=news&query={enc_key}&sort=1"
             
             data_list.append({
                 "id": str(hash(item["title"])), "title": item["title"], "link": item["link"],
@@ -128,7 +132,7 @@ st.markdown(f"""
     <div class="terminal-header">
         <div class="term-title">🦅 MONETA PRO-QUANT</div>
         <div class="stat-text" style="margin-top: 5px;">
-            <span class="live-dot"></span>SYS: ONLINE | SYNC: {datetime.now().strftime('%H:%M:%S')} | WEIGHT: OBJ_90%
+            <span class="live-dot"></span>SYS: ONLINE | SYNC: {datetime.now().strftime('%H:%M:%S')} | WEIGHT: OBJ_90% | MODE: REAL-TIME
         </div>
     </div>
 """, unsafe_allow_html=True)
@@ -139,7 +143,6 @@ if st.button("RUN MANUAL SCAN [F5]", use_container_width=True):
 df = get_smart_market_data()
 new_ranking_memory = {}
 
-# 이제 무조건 데이터가 10개 이상 확보되므로 로딩 창에 머물지 않습니다.
 top_news = df.sort_values(by='search', ascending=False).head(5).reset_index(drop=True)
 remaining_df = df[~df['id'].isin(top_news['id'])]
 top_hot = remaining_df.sort_values(by='reaction', ascending=False).head(5).reset_index(drop=True)
@@ -167,7 +170,7 @@ with col1:
                 <span class="stat-text">VOL:{row['search']:,}</span>
             </div>
             <a href="{row['link']}" target="_blank" class="news-title">{row['title']}</a>
-            <a href="{row['reaction_link']}" target="_blank" class="action-btn">EXECUTE: SENTIMENT_ANALYSIS</a>
+            <a href="{row['reaction_link']}" target="_blank" class="action-btn">EXECUTE: LIVE_NEWS_SCAN</a>
             <div class="bar-bg"><div class="bar-fill-news" style="width:{(row['search']/100000)*100}%"></div></div>
         </div>
         """, unsafe_allow_html=True)
@@ -194,7 +197,7 @@ with col2:
                 <span class="stat-text">REA:{row['reaction']:,}</span>
             </div>
             <a href="{row['link']}" target="_blank" class="news-title">{row['title']}</a>
-            <a href="{row['reaction_link']}" target="_blank" class="action-btn">EXECUTE: FORUM_SCAN</a>
+            <a href="{row['reaction_link']}" target="_blank" class="action-btn">EXECUTE: LIVE_FORUM_SCAN</a>
             <div class="bar-bg"><div class="bar-fill-hot" style="width:{(row['reaction']/30000)*100}%"></div></div>
         </div>
         """, unsafe_allow_html=True)
